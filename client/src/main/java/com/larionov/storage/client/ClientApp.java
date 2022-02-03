@@ -1,4 +1,4 @@
-package com.larionov.client;
+package com.larionov.storage.client;
 
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;

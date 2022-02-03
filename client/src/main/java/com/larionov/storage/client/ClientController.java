@@ -1,4 +1,4 @@
-package com.larionov.client;
+package com.larionov.storage.client;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
