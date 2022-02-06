@@ -1,21 +1,20 @@
 package com.larionov.storage.client;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.net.Socket;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ResourceBundle;
-
+import com.larionov.storage.core.files.FileViewer;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
+import javafx.event.Event;
 import javafx.fxml.Initializable;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
+
+import java.io.*;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.ResourceBundle;
 
 public class ClientController implements Initializable {
 
@@ -23,13 +22,17 @@ public class ClientController implements Initializable {
 
     public TextField tfLog;
     public TextField tfLocalPath;
+    public ComboBox<String> cbLocalPath;
 
     private DataInputStream is;
     private DataOutputStream os;
 
     private File currentDir;
+    private FileViewer fileViewer;
 
     private byte[] buf;
+
+    private ObservableList<String> paths;
 
     public void sendMessage(ActionEvent actionEvent) throws IOException {
         String fileName = tfLog.getText();
@@ -64,13 +67,14 @@ public class ClientController implements Initializable {
 
     private void fillCurrentDirFiles() {
         lvLocalFiles.getItems().clear();
-        lvLocalFiles.getItems().add("..");
-        lvLocalFiles.getItems().addAll(currentDir.list());
-        tfLocalPath.clear();
         try {
-            tfLocalPath.appendText(currentDir.getCanonicalPath());
+            String[] files = new String[fileViewer.getListFiles().size()];
+            fileViewer.getListFiles().toArray(files);
+            lvLocalFiles.getItems().addAll(files);
+            tfLocalPath.clear();
+            tfLocalPath.appendText(fileViewer.getViewDir());
         } catch (IOException e) {
-            e.printStackTrace();
+            tfLog.appendText("Ошибка работы с файлами: " + e.getMessage());
         }
     }
 
@@ -78,32 +82,34 @@ public class ClientController implements Initializable {
         lvLocalFiles.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
                 String fileName = lvLocalFiles.getSelectionModel().getSelectedItem();
-                System.out.println("Выбран файл: " + fileName);
-                Path path = currentDir.toPath().resolve(fileName);
-                if (Files.isDirectory(path)) {
-                    currentDir = path.toFile();
+                if (fileViewer.resolveFile(fileName)) {
                     fillCurrentDirFiles();
-                    tfLog.clear();
                 } else {
-                    tfLog.setText(fileName);
+                    tfLog.appendText(fileName);
                 }
             }
         });
     }
 
+    public void setRootPath(Event event){
+        fileViewer.goToPath(cbLocalPath.getValue());
+        fillCurrentDirFiles();
+    }
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         try {
-            buf = new byte[256];
-            currentDir = new File(System.getProperty("user.home"));
+            paths = FXCollections.observableArrayList();
+            File[] roots = File.listRoots();
+            for (int i = 0; i < roots.length; i++) {
+                paths.add(roots[i].getPath());
+            }
+            cbLocalPath.setItems(paths);
+            fileViewer = new FileViewer();
             fillCurrentDirFiles();
             initClickListener();
-            Socket socket = new Socket("localhost", 8189);
-            is = new DataInputStream(socket.getInputStream());
-            os = new DataOutputStream(socket.getOutputStream());
-            Thread readThread = new Thread(this::read);
-            readThread.setDaemon(true);
-            readThread.start();
+
+            cbLocalPath.setOnAction(this::setRootPath);
         } catch (Exception e) {
             e.printStackTrace();
         }
