@@ -1,28 +1,37 @@
 package com.larionov.storage.client;
 
 import com.larionov.storage.core.files.FileViewer;
+import com.larionov.storage.core.net.AuthMessage;
+import com.larionov.storage.core.net.AuthorizationTrue;
+import com.larionov.storage.core.net.ErrorMessage;
+import com.larionov.storage.core.net.FileList;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.event.Event;
 import javafx.fxml.Initializable;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.ListView;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 
 import java.io.*;
 import java.net.URL;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
 
-public class ClientController implements Initializable {
+public class ClientController implements Initializable, NetListener {
 
     public ListView<String> lvLocalFiles;
+    public ListView<String> lvServerFiles;
 
-    public TextField tfLog;
+    public TextArea taLog;
     public TextField tfLocalPath;
+    public TextField tfServerPath;
+    public TextField tfHost;
+    public TextField tfPort;
+    public TextField tfLogin;
+    public TextField pfPassword;
     public ComboBox<String> cbLocalPath;
+    public Button bConnect;
 
     private DataInputStream is;
     private DataOutputStream os;
@@ -35,7 +44,7 @@ public class ClientController implements Initializable {
     private ObservableList<String> paths;
 
     public void sendMessage(ActionEvent actionEvent) throws IOException {
-        String fileName = tfLog.getText();
+        String fileName = taLog.getText();
         File currentFile = currentDir.toPath().resolve(fileName).toFile();
         os.writeUTF("#SEND#FILE#");
         os.writeUTF(fileName);
@@ -50,14 +59,14 @@ public class ClientController implements Initializable {
             }
         }
         os.flush();
-        tfLog.clear();
+        taLog.clear();
     }
 
     private void read() {
         try {
             while (true) {
                 String message = is.readUTF();
-                Platform.runLater(() -> tfLog.setText(message));
+                Platform.runLater(() -> taLog.setText(message));
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -65,17 +74,13 @@ public class ClientController implements Initializable {
         }
     }
 
-    private void fillCurrentDirFiles() {
-        lvLocalFiles.getItems().clear();
-        try {
-            String[] files = new String[fileViewer.getListFiles().size()];
-            fileViewer.getListFiles().toArray(files);
-            lvLocalFiles.getItems().addAll(files);
-            tfLocalPath.clear();
-            tfLocalPath.appendText(fileViewer.getViewDir());
-        } catch (IOException e) {
-            tfLog.appendText("Ошибка работы с файлами: " + e.getMessage());
-        }
+    private void fillCurrentDirFiles(ListView<String> lvFiles, TextField path, List<String> filesList, String viewPath) {
+        lvFiles.getItems().clear();
+        String[] files = new String[filesList.size()];
+        filesList.toArray(files);
+        lvFiles.getItems().addAll(files);
+        path.clear();
+        path.appendText(viewPath);
     }
 
     private void initClickListener() {
@@ -83,9 +88,13 @@ public class ClientController implements Initializable {
             if (e.getClickCount() == 2) {
                 String fileName = lvLocalFiles.getSelectionModel().getSelectedItem();
                 if (fileViewer.resolveFile(fileName)) {
-                    fillCurrentDirFiles();
+                    try {
+                        fillCurrentDirFiles(lvLocalFiles, tfLocalPath, fileViewer.getListFiles(), fileViewer.getViewDir());
+                    } catch (IOException ex) {
+                        taLog.appendText("Ошибка работы с файлами: " + ex.getMessage());
+                    }
                 } else {
-                    tfLog.appendText(fileName);
+                    taLog.appendText(fileName);
                 }
             }
         });
@@ -93,7 +102,34 @@ public class ClientController implements Initializable {
 
     public void setRootPath(Event event){
         fileViewer.goToPath(cbLocalPath.getValue());
-        fillCurrentDirFiles();
+        try {
+            fillCurrentDirFiles(lvLocalFiles, tfLocalPath, fileViewer.getListFiles(), fileViewer.getViewDir());
+        } catch (IOException ex) {
+            taLog.appendText("Ошибка работы с файлами: " + ex.getMessage());
+        }
+    }
+
+    public void clickConnect(Event e) {
+        Net netInstance = Net.getInstance();
+        if (!netInstance.isConnected()){
+            netInstance.addHost(tfHost.getText(), Integer.parseInt(tfPort.getText()));
+            taLog.appendText("Start connecting to host\n");
+            try {
+                netInstance.addListener(this);
+                netInstance.connect();
+            } catch (Exception e1) {
+                taLog.appendText(e1.getMessage() + "\n");
+            }
+        } else {
+            sendAuthorization();
+        }
+    }
+
+    private void sendAuthorization(){
+        taLog.appendText("Start authorization\n");
+        AuthMessage message = new AuthMessage(tfLogin.getText(), pfPassword.getText());
+        Net netInstance = Net.getInstance();
+        netInstance.write(message);
     }
 
     @Override
@@ -106,12 +142,41 @@ public class ClientController implements Initializable {
             }
             cbLocalPath.setItems(paths);
             fileViewer = new FileViewer();
-            fillCurrentDirFiles();
+            try {
+                fillCurrentDirFiles(lvLocalFiles, tfLocalPath, fileViewer.getListFiles(), fileViewer.getViewDir());
+            } catch (IOException ex) {
+                taLog.appendText("Ошибка работы с файлами: " + ex.getMessage());
+            }
             initClickListener();
+
+            bConnect.setOnAction(this::clickConnect);
 
             cbLocalPath.setOnAction(this::setRootPath);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    @Override
+    public void onConnectionActive() {
+        taLog.appendText("Host connected\n");
+        sendAuthorization();
+    }
+
+    @Override
+    public void onError(ErrorMessage message) {
+        taLog.appendText("Server return error: " + message.getMessage() + "\n");
+    }
+
+    @Override
+    public void onAuthorizationTrue(AuthorizationTrue message) {
+        taLog.appendText("Successful authorization\n");
+        if (!message.getMessage().isEmpty())
+            taLog.appendText(message.getMessage() + "\n");
+    }
+
+    @Override
+    public void onFileList(FileList message) {
+        fillCurrentDirFiles(lvServerFiles, tfServerPath, message.getList(), message.getViewPath());
     }
 }
