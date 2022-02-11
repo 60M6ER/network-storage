@@ -1,6 +1,4 @@
-D:\Development\Java\network-storage\server\src\main\java\com\larionov\storage\server\StringMessageHandler.java
-D:\Development\Java\network-storage\server\src\main\java\com\larionov\storage\server\EchoStringPipeLine.java
-D:\Development\Java\network-storage\server\src\main\java\com\larionov\storage\server\FileProcessorHandler.java
+D:\Development\Java\network-storage\server\src\main\java\com\larionov\storage\server\SerializableHandler.java
 D:\Development\Java\network-storage\server\src\main\java\com\larionov\storage\server\SerializablePipeline.java
-D:\Development\Java\network-storage\server\src\main\java\com\larionov\storage\server\EchoStringHandler.java
 D:\Development\Java\network-storage\server\src\main\java\com\larionov\storage\server\Server.java
+D:\Development\Java\network-storage\server\src\main\java\com\larionov\storage\server\SimpleAuthorizationService.java

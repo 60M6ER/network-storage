@@ -1,0 +1,6 @@
+com\larionov\storage\server\Server.class
+com\larionov\storage\server\SimpleAuthorizationService$pairAuth.class
+com\larionov\storage\server\SimpleAuthorizationService.class
+com\larionov\storage\server\SerializablePipeline.class
+com\larionov\storage\server\SerializableHandler.class
+com\larionov\storage\server\SerializableHandler$1.class

@@ -7,6 +7,7 @@ import io.netty.channel.ChannelHandlerContext;
 
 public interface NetListener {
     void onConnectionActive();
+    void onConnectionInactive();
     void onError(ErrorMessage message);
     void onFileList(FileList message);
     void onAuthorizationTrue(AuthorizationTrue message);

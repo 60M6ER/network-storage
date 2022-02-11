@@ -42,7 +42,7 @@ public class FileViewer {
     }
 
     public boolean resolveFile(String name){
-        if(name.equals("..")) {
+        if(name.equals(FileDescription.getPathToParent().getName())) {
             if (!currentDir.equals(rootDir)) goToParent();
             return true;
         }
@@ -56,17 +56,43 @@ public class FileViewer {
         }
     }
 
-    public List<String> getListFiles() throws IOException {
-        ArrayList<String> files = new ArrayList<>();
-        if (isParent())
-            files.add("..");
+    public void createFolder(String nameFile) throws IOException {
+        Path newFile = currentDir.resolve(nameFile);
+        Files.createDirectory(newFile);
+    }
+
+    public void renameFile(String oldName, String newName) throws IOException{
+        Path currentFile = currentDir.resolve(oldName);
+        Files.move(currentFile, currentFile.resolveSibling(newName));
+    }
+
+    public void deleteFile(String nameFile) throws IOException{
+        Path currentFile = currentDir.resolve(nameFile);
+        Files.delete(currentFile);
+    }
+
+    public List<FileDescription> getListFiles() throws IOException {
+        ArrayList<FileDescription> files = new ArrayList<>();
+        if (isParent() && rootDir == null ||
+                isParent() && rootDir != null && !Files.isSameFile(currentDir, rootDir))
+            files.add(FileDescription.getPathToParent());
         Files.list(currentDir).forEach(f -> {
-            files.add(f.getFileName().toString());
+            try {
+                files.add(new FileDescription(
+                        Files.isDirectory(f),
+                        f.getFileName().toString(),
+                        Files.isDirectory(f) ? 0 : Files.size(f))
+                );
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         });
         return files;
     }
 
     public String getViewDir() {
+        if (rootDir != null)
+            return currentDir.toString().replace(rootDir.toString(), "home");
         return currentDir.toString();
     }
 }

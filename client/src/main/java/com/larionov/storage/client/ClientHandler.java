@@ -24,6 +24,17 @@ public class ClientHandler extends SimpleChannelInboundHandler<Message> {
     }
 
     @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        Net.getInstance().setConnected(false);
+        listener.onConnectionInactive();
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        listener.onError(new ErrorMessage(cause.getMessage()));
+    }
+
+    @Override
     protected void channelRead0(ChannelHandlerContext ctx, Message message) throws Exception {
         switch (message.getTypeMessage()) {
             case ERROR:

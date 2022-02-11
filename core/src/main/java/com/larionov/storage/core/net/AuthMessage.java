@@ -2,7 +2,7 @@ package com.larionov.storage.core.net;
 
 import lombok.Getter;
 
-public class AuthMessage implements Message {
+public class AuthMessage extends Message {
 
     @Getter
     private String Login;

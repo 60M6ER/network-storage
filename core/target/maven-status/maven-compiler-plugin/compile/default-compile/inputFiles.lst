@@ -1,1 +1,11 @@
+D:\Development\Java\network-storage\core\src\main\java\com\larionov\storage\core\net\AuthMessage.java
+D:\Development\Java\network-storage\core\src\main\java\com\larionov\storage\core\net\CreateFolder.java
+D:\Development\Java\network-storage\core\src\main\java\com\larionov\storage\core\net\ErrorMessage.java
+D:\Development\Java\network-storage\core\src\main\java\com\larionov\storage\core\net\FileList.java
+D:\Development\Java\network-storage\core\src\main\java\com\larionov\storage\core\net\AuthorizationTrue.java
+D:\Development\Java\network-storage\core\src\main\java\com\larionov\storage\core\net\DeleteFile.java
 D:\Development\Java\network-storage\core\src\main\java\com\larionov\storage\core\files\FileViewer.java
+D:\Development\Java\network-storage\core\src\main\java\com\larionov\storage\core\net\Message.java
+D:\Development\Java\network-storage\core\src\main\java\com\larionov\storage\core\auth\AuthorizationService.java
+D:\Development\Java\network-storage\core\src\main\java\com\larionov\storage\core\net\TypeMessage.java
+D:\Development\Java\network-storage\core\src\main\java\com\larionov\storage\core\net\RenameFile.java

@@ -12,6 +12,7 @@ import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -23,6 +24,7 @@ public class Net {
     private String host;
     private Integer port;
     @Getter
+    @Setter
     private boolean connected;
 
     private static Net INSTANCE;

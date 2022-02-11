@@ -1,0 +1,11 @@
+com\larionov\storage\core\files\FileViewer.class
+com\larionov\storage\core\net\CreateFolder.class
+com\larionov\storage\core\net\ErrorMessage.class
+com\larionov\storage\core\net\Message.class
+com\larionov\storage\core\auth\AuthorizationService.class
+com\larionov\storage\core\net\RenameFile.class
+com\larionov\storage\core\net\AuthMessage.class
+com\larionov\storage\core\net\FileList.class
+com\larionov\storage\core\net\AuthorizationTrue.class
+com\larionov\storage\core\net\DeleteFile.class
+com\larionov\storage\core\net\TypeMessage.class

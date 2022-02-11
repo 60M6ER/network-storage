@@ -1,18 +1,18 @@
 package com.larionov.storage.core.net;
 
+import com.larionov.storage.core.files.FileDescription;
 import lombok.Getter;
 
-import java.io.File;
 import java.util.List;
 
-public class FileList implements Message{
+public class FileList extends Message{
 
     @Getter
     private String viewPath;
     @Getter
-    private List<String> list;
+    private List<FileDescription> list;
 
-    public FileList(String viewPath, List<String> list) {
+    public FileList(String viewPath, List<FileDescription> list) {
         this.viewPath = viewPath;
         this.list = list;
     }

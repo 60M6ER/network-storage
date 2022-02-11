@@ -2,19 +2,14 @@ package com.larionov.storage.server;
 
 import com.larionov.storage.core.auth.AuthorizationService;
 import com.larionov.storage.core.files.FileViewer;
-import com.larionov.storage.core.net.AuthMessage;
-import com.larionov.storage.core.net.ErrorMessage;
-import com.larionov.storage.core.net.FileList;
-import com.larionov.storage.core.net.Message;
+import com.larionov.storage.core.net.*;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 @Slf4j
 public class SerializableHandler extends SimpleChannelInboundHandler<Message> {
@@ -32,6 +27,7 @@ public class SerializableHandler extends SimpleChannelInboundHandler<Message> {
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         log.info("New accept user [" + ctx.channel().remoteAddress().toString() + "]");
+        //ctx.writeAndFlush(new AuthorizationTrue("Не авторизованы"));
     }
 
     @Override
@@ -51,10 +47,28 @@ public class SerializableHandler extends SimpleChannelInboundHandler<Message> {
                     login = authMessage.getLogin();
                     log.info("Authorized user with login: " + login);
                     createFileViewer();
+                    ctx.writeAndFlush(new AuthorizationTrue(""));
                     sendFileList(ctx);
                 } else {
                     ctx.writeAndFlush(new ErrorMessage("Wrong login or password."));
                 }
+                break;
+            case CREATE_FOLDER:
+                fileViewer.createFolder(((CreateFolder) message).getNameFile());
+                sendFileList(ctx);
+                break;
+            case RENAME:
+                RenameFile renameMessage = (RenameFile) message;
+                fileViewer.renameFile(renameMessage.getOldName(), renameMessage.getNewName());
+                sendFileList(ctx);
+                break;
+            case DELETE:
+                fileViewer.deleteFile(((DeleteFile) message).getNameFile());
+                sendFileList(ctx);
+                break;
+            case OPEN_FOLDER:
+                fileViewer.resolveFile(((OpenFolder) message).getNameFile());
+                sendFileList(ctx);
                 break;
         }
     }
