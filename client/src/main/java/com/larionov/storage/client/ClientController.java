@@ -11,6 +11,7 @@ import javafx.event.Event;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.AnchorPane;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
@@ -32,6 +33,10 @@ public class ClientController implements Initializable, NetListener {
     public TextField pfPassword;
     public ComboBox<String> cbLocalPath;
     public Button bConnect;
+    public AnchorPane PaneProgress;
+    public Label lStatusDownload;
+    public ProgressBar pbDownload;
+
 
     ContextMenu contextMenu;
     private MenuItem miCreateFolder;
@@ -281,6 +286,7 @@ public class ClientController implements Initializable, NetListener {
             });
             lvServerFiles.setCellFactory(new CellFactory());
 
+            PaneProgress.setVisible(false);
             //TODO: remove before the production
             fillingStartData();
         } catch (Exception e) {

@@ -41,6 +41,10 @@ public class FileViewer {
         return goToPath(Paths.get(path));
     }
 
+    public Path getPathToFile(String name){
+        return currentDir.resolve(name);
+    }
+
     public boolean resolveFile(String name){
         if(name.equals(FileDescription.getPathToParent().getName())) {
             if (!currentDir.equals(rootDir)) goToParent();
