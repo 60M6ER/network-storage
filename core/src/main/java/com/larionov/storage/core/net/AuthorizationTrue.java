@@ -2,7 +2,7 @@ package com.larionov.storage.core.net;
 
 import lombok.Getter;
 
-public class AuthorizationTrue extends Message {
+public class AuthorizationTrue extends AbstractMessage {
 
     @Getter
     private String message;

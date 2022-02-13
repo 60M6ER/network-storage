@@ -2,7 +2,7 @@ package com.larionov.storage.core.net;
 
 import lombok.Getter;
 
-public class OpenFolder extends Message {
+public class OpenFolder extends AbstractMessage {
 
     @Getter
     private String nameFile;

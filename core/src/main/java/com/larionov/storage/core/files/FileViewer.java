@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 public class FileViewer {
 
@@ -70,9 +71,24 @@ public class FileViewer {
         Files.move(currentFile, currentFile.resolveSibling(newName));
     }
 
+    private void delete(Path delPath) {
+        try {
+            if (Files.isDirectory(delPath)) {
+                Stream<Path> listFiles = Files.list(delPath);
+                if (listFiles.count() > 0) {
+                    listFiles.forEach(this::delete);
+                }
+            }
+            Files.delete(delPath);
+        } catch (IOException e) {
+
+        }
+    }
+
     public void deleteFile(String nameFile) throws IOException{
         Path currentFile = currentDir.resolve(nameFile);
-        Files.delete(currentFile);
+        delete(currentFile);
+
     }
 
     public List<FileDescription> getListFiles() throws IOException {

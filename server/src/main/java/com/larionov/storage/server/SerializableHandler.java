@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 @Slf4j
-public class SerializableHandler extends SimpleChannelInboundHandler<Message> {
+public class SerializableHandler extends SimpleChannelInboundHandler<AbstractMessage> {
 
     private String login;
     private Path path;
@@ -36,10 +36,10 @@ public class SerializableHandler extends SimpleChannelInboundHandler<Message> {
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, Message message) throws Exception {
-        switch (message.getTypeMessage()) {
+    protected void channelRead0(ChannelHandlerContext ctx, AbstractMessage abstractMessage) throws Exception {
+        switch (abstractMessage.getTypeMessage()) {
             case AUTH:
-                AuthMessage authMessage = (AuthMessage) message;
+                AuthMessage authMessage = (AuthMessage) abstractMessage;
                 if (authorizationService.authorize(
                         authMessage.getLogin(),
                         authMessage.getPassword()
@@ -54,20 +54,22 @@ public class SerializableHandler extends SimpleChannelInboundHandler<Message> {
                 }
                 break;
             case CREATE_FOLDER:
-                fileViewer.createFolder(((CreateFolder) message).getNameFile());
-                sendFileList(ctx);
+                CreateFolder createFolder = (CreateFolder) abstractMessage;
+                fileViewer.createFolder(createFolder.getNameFile());
+                if (!createFolder.isSendingFile())
+                    sendFileList(ctx);
                 break;
             case RENAME:
-                RenameFile renameMessage = (RenameFile) message;
+                RenameFile renameMessage = (RenameFile) abstractMessage;
                 fileViewer.renameFile(renameMessage.getOldName(), renameMessage.getNewName());
                 sendFileList(ctx);
                 break;
             case DELETE:
-                fileViewer.deleteFile(((DeleteFile) message).getNameFile());
+                fileViewer.deleteFile(((DeleteFile) abstractMessage).getNameFile());
                 sendFileList(ctx);
                 break;
             case OPEN_FOLDER:
-                fileViewer.resolveFile(((OpenFolder) message).getNameFile());
+                fileViewer.resolveFile(((OpenFolder) abstractMessage).getNameFile());
                 sendFileList(ctx);
                 break;
         }

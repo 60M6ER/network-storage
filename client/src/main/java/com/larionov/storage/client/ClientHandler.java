@@ -3,11 +3,11 @@ package com.larionov.storage.client;
 import com.larionov.storage.core.net.AuthorizationTrue;
 import com.larionov.storage.core.net.ErrorMessage;
 import com.larionov.storage.core.net.FileList;
-import com.larionov.storage.core.net.Message;
+import com.larionov.storage.core.net.AbstractMessage;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
-public class ClientHandler extends SimpleChannelInboundHandler<Message> {
+public class ClientHandler extends SimpleChannelInboundHandler<AbstractMessage> {
     private NetListener listener;
 
     public ClientHandler(NetListener listener) {
@@ -35,16 +35,16 @@ public class ClientHandler extends SimpleChannelInboundHandler<Message> {
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, Message message) throws Exception {
-        switch (message.getTypeMessage()) {
+    protected void channelRead0(ChannelHandlerContext ctx, AbstractMessage abstractMessage) throws Exception {
+        switch (abstractMessage.getTypeMessage()) {
             case ERROR:
-                listener.onError((ErrorMessage) message);
+                listener.onError((ErrorMessage) abstractMessage);
                 break;
             case AUTH_TRUE:
-                listener.onAuthorizationTrue((AuthorizationTrue) message);
+                listener.onAuthorizationTrue((AuthorizationTrue) abstractMessage);
                 break;
             case FILE_LIST:
-                listener.onFileList((FileList) message);
+                listener.onFileList((FileList) abstractMessage);
         }
     }
 }

@@ -2,7 +2,7 @@ package com.larionov.storage.core.net;
 
 import lombok.Getter;
 
-public class RenameFile extends Message {
+public class RenameFile extends AbstractMessage {
 
     @Getter
     private String oldName;

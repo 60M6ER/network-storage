@@ -1,6 +1,6 @@
 package com.larionov.storage.client;
 
-import com.larionov.storage.core.net.Message;
+import com.larionov.storage.core.net.AbstractMessage;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -45,7 +45,7 @@ public class Net {
         //Thread.sleep(500);
     }
 
-    public void write(Message msg) {
+    public void write(AbstractMessage msg) {
         channel.writeAndFlush(msg);
     }
 

@@ -2,7 +2,7 @@ package com.larionov.storage.core.net;
 
 import lombok.Getter;
 
-public class DeleteFile extends Message {
+public class DeleteFile extends AbstractMessage {
 
     @Getter
     private String nameFile;

@@ -1,5 +1,8 @@
 package com.larionov.storage.client;
 
+import com.larionov.storage.core.download.FileSendManager;
+import com.larionov.storage.core.download.StatusSend;
+import com.larionov.storage.core.download.StatusSenderListener;
 import com.larionov.storage.core.files.FileDescription;
 import com.larionov.storage.core.files.FileViewer;
 import com.larionov.storage.core.net.*;
@@ -19,7 +22,9 @@ import java.net.URL;
 import java.util.List;
 import java.util.ResourceBundle;
 @Slf4j
-public class ClientController implements Initializable, NetListener {
+public class ClientController implements Initializable, NetListener, StatusSenderListener {
+
+    private static final int DELAY_PROGRESS_BAR = 5 * 1000;
 
     public ListView<FileDescription> lvLocalFiles;
     public ListView<FileDescription> lvServerFiles;
@@ -153,9 +158,9 @@ public class ClientController implements Initializable, NetListener {
 
         if (e.getTarget() == miCreateFolder){
             listView.getItems().add(new FileDescription(true, "New folder"));
+            listView.scrollTo(listView.getItems().size() - 1);
             listView.setEditable(true);
             listView.layout();
-            listView.scrollTo(listView.getItems().size() - 1);
             int size = listView.getItems().size();
             listView.setOnEditCancel(value -> {
                 if (size == listView.getItems().size())
@@ -294,6 +299,26 @@ public class ClientController implements Initializable, NetListener {
         }
     }
 
+    private void hideProgressBar() {
+        Runnable task = (() -> {
+            try {
+                Thread.sleep(DELAY_PROGRESS_BAR);
+                Platform.runLater(() -> PaneProgress.setVisible(false));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        task.run();
+    }
+
+    private void updateProgressDownload(FileSendManager sendManager){
+        Platform.runLater(() -> {
+            StatusSend status = sendManager.getStatus();
+            lStatusDownload.setText(status.getMessageStatus());
+            pbDownload.setProgress(status.getGlobalProgress());
+        });
+    }
+
     @Override
     public void onConnectionActive() {
         taLog.appendText("Host connected\n");
@@ -326,5 +351,41 @@ public class ClientController implements Initializable, NetListener {
                 message.getList(),
                 message.getViewPath())
         );
+    }
+
+    @Override
+    public void startProcess(FileSendManager sendManager) {
+        Platform.runLater(() -> {
+            taLog.appendText("Start transfer file: " + sendManager.getCurFileName());
+            PaneProgress.setVisible(true);
+            lStatusDownload.setText("Calculating time");
+            pbDownload.setProgress(0.0);
+        });
+    }
+
+    @Override
+    public void startSendFiles(FileSendManager sendManager) {
+        updateProgressDownload(sendManager);
+    }
+
+    @Override
+    public void sendStatus(FileSendManager sendManager) {
+        updateProgressDownload(sendManager);
+    }
+
+    @Override
+    public void finishedDownload(FileSendManager sendManager) {
+        Platform.runLater(() -> {
+            taLog.appendText("File transfer finished" + "\n");
+            lStatusDownload.setText("Finished transfer files");
+            pbDownload.setProgress(100.0);
+        });
+        hideProgressBar();
+    }
+
+    @Override
+    public void anExceptionOccurred(Exception e, FileSendManager fileSendManager) {
+        Platform.runLater(() -> taLog.appendText("File transfer failed: " + e.getMessage() + "\n"));
+        hideProgressBar();
     }
 }

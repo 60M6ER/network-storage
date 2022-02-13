@@ -2,7 +2,7 @@ package com.larionov.storage.core.net;
 
 import lombok.Getter;
 
-public class ErrorMessage extends Message{
+public class ErrorMessage extends AbstractMessage {
 
     @Getter
     private String message;

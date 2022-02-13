@@ -5,7 +5,7 @@ import lombok.Getter;
 
 import java.util.List;
 
-public class FileList extends Message{
+public class FileList extends AbstractMessage {
 
     @Getter
     private String viewPath;
