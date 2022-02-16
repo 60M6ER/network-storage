@@ -1,16 +1,20 @@
 package com.larionov.storage.core.files;
 
+import lombok.Getter;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class FileViewer {
 
     private Path rootDir;
+    @Getter
     private Path currentDir;
 
     public FileViewer() {
@@ -71,24 +75,19 @@ public class FileViewer {
         Files.move(currentFile, currentFile.resolveSibling(newName));
     }
 
-    private void delete(Path delPath) {
-        try {
-            if (Files.isDirectory(delPath)) {
-                Stream<Path> listFiles = Files.list(delPath);
-                if (listFiles.count() > 0) {
-                    listFiles.forEach(this::delete);
-                }
+    private void delete(Path delPath) throws IOException{
+        if (Files.isDirectory(delPath)) {
+            List<Path> listFiles = Files.list(delPath).collect(Collectors.toList());
+            for (int i = 0; i < listFiles.size(); i++) {
+                delete(listFiles.get(i));
             }
-            Files.delete(delPath);
-        } catch (IOException e) {
-
         }
+        Files.delete(delPath);
     }
 
     public void deleteFile(String nameFile) throws IOException{
         Path currentFile = currentDir.resolve(nameFile);
         delete(currentFile);
-
     }
 
     public List<FileDescription> getListFiles() throws IOException {

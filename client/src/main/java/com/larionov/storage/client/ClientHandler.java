@@ -1,9 +1,6 @@
 package com.larionov.storage.client;
 
-import com.larionov.storage.core.net.AuthorizationTrue;
-import com.larionov.storage.core.net.ErrorMessage;
-import com.larionov.storage.core.net.FileList;
-import com.larionov.storage.core.net.AbstractMessage;
+import com.larionov.storage.core.net.*;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
@@ -45,6 +42,9 @@ public class ClientHandler extends SimpleChannelInboundHandler<AbstractMessage> 
                 break;
             case FILE_LIST:
                 listener.onFileList((FileList) abstractMessage);
+                break;
+            case PROCESSED_PACKAGE:
+                listener.onProcessedPackage((ProcessedPackage) abstractMessage);
         }
     }
 }

@@ -2,6 +2,7 @@ package com.larionov.storage.core.download;
 
 import com.larionov.storage.core.download.exeptions.ManagerInUsed;
 import com.larionov.storage.core.net.CreateFolder;
+import com.larionov.storage.core.net.SendDescriptionsMessage;
 import com.larionov.storage.core.net.SendFile;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,20 +12,26 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.UUID;
+import java.util.concurrent.Exchanger;
 
 @Slf4j
 public class FileSendManager {
+    @Getter
+    private static final Exchanger<Boolean> synchronizer = new Exchanger<>();
+
     private static final int BUFF_SIZE = 2048;
-    private static final long SIZE_FOLDER = 20;
-    private static final long SECONDS_DIVIDER = 1000000000L;
-    private static final long MINUTES_DIVIDER = 1000000000L * 60;
-    private static final long HOUR_DIVIDER = 1000000000L * 60 * 60;
+
+    @Getter
+    private final UUID idTransfer = UUID.randomUUID();
 
     @Getter
     private Thread thread;
     private boolean failure = false;
 
-    private Path pathFile;
+    private final Path pathFile;
     private long size = 0;
     private long sentBytes = 0;
 
@@ -34,24 +41,17 @@ public class FileSendManager {
     private int fileProgress;
 
     @Setter
-    private NetHandler netHandler;
-    @Setter
     private StatusSenderListener statusSenderListener;
 
-    public FileSendManager(Path pathFile, NetHandler netHandler, StatusSenderListener statusSenderListener) {
+    public FileSendManager(Path pathFile, StatusSenderListener statusSenderListener) {
         this.pathFile = pathFile;
-        this.netHandler = netHandler;
         this.statusSenderListener = statusSenderListener;
-    }
-
-    public FileSendManager(Path pathFile, NetHandler netHandler) {
-        this.pathFile = pathFile;
-        this.netHandler = netHandler;
     }
 
     public void send() {
         if (thread == null) {
             thread = new Thread(this::start);
+            thread.setPriority(Thread.MIN_PRIORITY);
             thread.setDaemon(true);
             thread.start();
         }else {
@@ -64,109 +64,103 @@ public class FileSendManager {
         long curTime = System.nanoTime();
         StatusSend statusSend = new StatusSend();
         statusSend.setTimePassed(curTime - timeStart);
-        statusSend.setTimeLeft((size - sentBytes) * statusSend.getTimePassed() / sentBytes);
-        statusSend.setGlobalProgress(sentBytes * 100.0 / size);
+        statusSend.setTimeLeft(sentBytes > 0 ?
+                (size - sentBytes) * statusSend.getTimePassed() / sentBytes
+                : 0);
+        statusSend.setGlobalProgress(sentBytes * 1.0 / size);
 
         statusSend.setMessageStatus(String.format(
-                "%s -> %s File: %s %s%",
-                timesToString(statusSend.getTimePassed()),
-                timesToString(statusSend.getTimeLeft()),
+                "%s -> %s File: %s %s%% %s/%s",
+                FileUtilities.timesToString(statusSend.getTimePassed()),
+                FileUtilities.timesToString(statusSend.getTimeLeft()),
                 curFileName,
-                fileProgress
+                fileProgress,
+                FileUtilities.bytesToString(sentBytes),
+                FileUtilities.bytesToString(size)
         ));
         return statusSend;
     }
 
-    private String timesToString(long time){
-        int hours = (int) (time / HOUR_DIVIDER);
-        long tomeLost = time % HOUR_DIVIDER;
-        int minutes = (int) (tomeLost / MINUTES_DIVIDER);
-        tomeLost = tomeLost % MINUTES_DIVIDER;
-        int seconds = (int) (tomeLost / SECONDS_DIVIDER);
-
-        String result = "";
-        result += hours > 0 ? hours + ":" : "";
-        result += minutes + ":" + seconds;
-
-        return result;
-    }
-
     private void start(){
         curFileName = pathFile.getFileName().toString();
-        if (statusSenderListener != null) statusSenderListener.startProcess(this);
-        try {
-            calculateSizeToSend(pathFile);
-            if (statusSenderListener != null) statusSenderListener.startSendFiles(this);
+
+        statusSenderListener.startProcess(this);
+        if (!thread.isInterrupted()) calculateSizeToSend(pathFile);
+        statusSenderListener.newSendMessage(new SendDescriptionsMessage(idTransfer, size));
+
+        if (!failure) {
+            statusSenderListener.startSendFiles(this);
             timeStart = System.nanoTime();
-            sendFiles(pathFile);
-            if (statusSenderListener != null) statusSenderListener.finishedDownload(this);
-        } catch (Exception e) {
-            failure = true;
-            if (statusSenderListener != null) statusSenderListener.anExceptionOccurred(e, this);
+            if (!thread.isInterrupted()) sendFiles(pathFile);
+        }
+
+        statusSenderListener.finishedDownload(this);
+    }
+
+    private String getFilePath(Path curPath) throws IOException {
+        if (Files.isSameFile(pathFile, curPath)){
+            return curPath.getFileName().toString();
+        } else {
+            return curPath.toString().replace(pathFile.toString(), "");
         }
     }
 
     private void sendFiles(Path path) {
         try {
+            if (thread.isInterrupted()) return;
             if (Files.isDirectory(path)) {
-                sentBytes += SIZE_FOLDER;
                 curFileName = path.getFileName().toString();
                 fileProgress = 100;
-                netHandler.sendMessage(new CreateFolder(
+                statusSenderListener.newSendMessage(new CreateFolder(
                         true,
                         curFileName
                 ));
+                if (!synchronizer.exchange(null)) throw new IOException("the server was unable to process the packet");
                 if (statusSenderListener != null) statusSenderListener.sendStatus(this);
                 Files.list(path).forEach(this::sendFiles);
             } else {
                 long sizeCurFile = Files.size(path);
-                curFileName = path.getFileName().toString();
-                if (sizeCurFile <= BUFF_SIZE) {
-                    fileProgress = 100;
-                    netHandler.sendMessage(new SendFile(
-                            curFileName,
-                            Files.size(path),
-                            Files.readAllBytes(path)
-                    ));
-                    sentBytes += sizeCurFile;
-                    if (statusSenderListener != null) statusSenderListener.sendStatus(this);
-                } else {
-                    InputStream inputStream = Files.newInputStream(path);
-                    int available = inputStream.available();
-                    while (available > 0) {
+                curFileName = getFilePath(path);
+                InputStream inputStream = Files.newInputStream(path);
+                int available = inputStream.available();
+                byte[] data = new byte[Math.min(available, BUFF_SIZE)];
+                while (available > 0 && !thread.isInterrupted()) {
 
-                        byte[] data = new byte[Math.min(available, BUFF_SIZE)];
+                    int read = inputStream.read(data);
 
-                        inputStream.read(data);
-
-                        netHandler.sendMessage(new SendFile(
-                                curFileName,
-                                sizeCurFile,
-                                data
-                        ));
-                        sentBytes += data.length;
-                        fileProgress = (int) (available * 100 / sizeCurFile);
-                        if (statusSenderListener != null) statusSenderListener.sendStatus(this);
-                        available = inputStream.available();
+                    if (read == 0) throw new RuntimeException("Failed to read file");
+                    if (read < data.length){
+                        data = Arrays.copyOf(data, read);
                     }
+                    statusSenderListener.newSendMessage(new SendFile(
+                            curFileName,
+                            sizeCurFile,
+                            data
+                    ));
+                    if (!synchronizer.exchange(null)) throw new IOException("the server was unable to process the packet");
+                    sentBytes += data.length;
+                    fileProgress = (int) ((sizeCurFile - available) * 100 / sizeCurFile);
+                    statusSenderListener.sendStatus(this);
+                    available = inputStream.available();
                 }
             }
-        } catch (IOException e) {
+        } catch (IOException | InterruptedException e) {
             failure = true;
-            if (statusSenderListener != null) statusSenderListener.anExceptionOccurred(e, this);
+            thread.interrupt();
+            statusSenderListener.anExceptionOccurred(e, this);
         }
     }
 
     private void calculateSizeToSend(Path path) {
         try {
             if (Files.isDirectory(path)) {
-                size += SIZE_FOLDER;
                 Files.list(path).forEach(this::calculateSizeToSend);
             } else {
                 size += Files.size(path);
             }
         } catch (IOException e) {
             failure = true;
+            thread.interrupt();
             if (statusSenderListener != null) statusSenderListener.anExceptionOccurred(e, this);
         }
     }

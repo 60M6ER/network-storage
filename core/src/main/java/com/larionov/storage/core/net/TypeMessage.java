@@ -9,5 +9,7 @@ public enum TypeMessage {
     RENAME,
     DELETE,
     OPEN_FOLDER,
-    SEND_FILE
+    SEND_FILE,
+    SEND_DESCRIPTIONS,
+    PROCESSED_PACKAGE
 }
