@@ -1,9 +1,6 @@
 package com.larionov.storage.client;
 
-import com.larionov.storage.core.net.AuthorizationTrue;
-import com.larionov.storage.core.net.ErrorMessage;
-import com.larionov.storage.core.net.FileList;
-import com.larionov.storage.core.net.ProcessedPackage;
+import com.larionov.storage.core.net.*;
 
 public interface NetListener {
     void onConnectionActive();
@@ -12,4 +9,5 @@ public interface NetListener {
     void onFileList(FileList message);
     void onAuthorizationTrue(AuthorizationTrue message);
     void onProcessedPackage(ProcessedPackage message);
+    void onTransferCommands(AbstractMessage message);
 }

@@ -106,11 +106,23 @@ public class SerializableHandler extends SimpleChannelInboundHandler<AbstractMes
                     sendFileList(ctx);
                     break;
                 case QUERY_FILE:
+                    if (transferService != null && transferService.isActive()) throw new RuntimeException("Create new manager");
+                    transferService = new FileSendManager(
+                            fileViewer.getPathToFile(((QueryFile) abstractMessage).getNameFile()),
+                            this
+                    );
+                    transferService.send();
+                    break;
+                case PROCESSED_PACKAGE:
+                    if (transferService == null || !transferService.isActive()) throw new RuntimeException("No suitable manager");
+                    transferService.sendMessage(abstractMessage);
             }
         } catch (Exception e) {
             if (abstractMessage instanceof CreateFolder && ((CreateFolder) abstractMessage).isSendingFile()
                     || abstractMessage instanceof SendFile
-                    || abstractMessage instanceof SendDescriptionsMessage) {
+                    || abstractMessage instanceof SendDescriptionsMessage
+                    || abstractMessage instanceof QueryFile
+                    || abstractMessage instanceof ProcessedPackage) {
                     ctx.writeAndFlush(new ErrorMessage(e.getMessage(),
                             new ErrorReceiveFile(e.getMessage())));
             }

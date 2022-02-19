@@ -72,6 +72,7 @@ public class FileDownloadManager implements TransferService{
             listener.newSendMessage(new ProcessedPackage(true));
             sentBytes += sendFile.getData().length;
             curFileSentBytes += sendFile.getData().length;
+            fileProgress = (int) (curFileSentBytes / sendFile.getSize() * 100);
             if (curFileSentBytes == sendFile.getSize())
                 closeOutputStream();
         } catch (IOException e) {
@@ -96,7 +97,23 @@ public class FileDownloadManager implements TransferService{
 
     @Override
     public StatusSend getStatus() {
-        return null;
+        long curTime = System.nanoTime();
+        StatusSend statusSend = new StatusSend();
+        statusSend.setTimePassed(curTime - timeStart);
+        statusSend.setTimeLeft(sentBytes > 0 ?
+                (long) ((double) (size - sentBytes) / sentBytes * statusSend.getTimePassed())
+                : 0);
+        statusSend.setGlobalProgress(sentBytes * 1.0 / size);
+        statusSend.setMessageStatus(String.format(
+                "%s -> %s File: %s %s%% %s/%s",
+                FileUtilities.timesToString(statusSend.getTimePassed()),
+                FileUtilities.timesToString(statusSend.getTimeLeft()),
+                curFileName,
+                fileProgress,
+                FileUtilities.bytesToString(sentBytes),
+                FileUtilities.bytesToString(size)
+        ));
+        return statusSend;
     }
 
     @Override

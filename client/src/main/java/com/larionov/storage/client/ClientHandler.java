@@ -45,6 +45,12 @@ public class ClientHandler extends SimpleChannelInboundHandler<AbstractMessage> 
                 break;
             case PROCESSED_PACKAGE:
                 listener.onProcessedPackage((ProcessedPackage) abstractMessage);
+                break;
+            case SEND_DESCRIPTIONS:
+            case CREATE_FOLDER:
+            case SEND_FILE:
+                listener.onTransferCommands(abstractMessage);
+                break;
         }
     }
 }

@@ -51,6 +51,7 @@ public class ClientController implements Initializable, NetListener, TransferLis
 
     private TransferService transferService;
     private boolean activeTransmission = false;
+    private String currentPathTransfer;
 
     private FileViewer fileViewer;
 
@@ -63,6 +64,7 @@ public class ClientController implements Initializable, NetListener, TransferLis
             taLog.appendText("File transfer in progress\n");
             return;
         }
+        currentPathTransfer = tfServerPath.getText();
         transferService = new FileSendManager(
                 fileViewer.getPathToFile(
                         lvLocalFiles.getSelectionModel().getSelectedItem().getName()
@@ -77,6 +79,7 @@ public class ClientController implements Initializable, NetListener, TransferLis
             taLog.appendText("File transfer in progress\n");
             return;
         }
+        currentPathTransfer = tfLocalPath.getText();
         transferService = new FileDownloadManager(
                 fileViewer.getCurrentDir(),
                 this
@@ -287,6 +290,7 @@ public class ClientController implements Initializable, NetListener, TransferLis
             lvServerFiles.setCellFactory(new CellFactory());
 
             bUpload.setOnAction(this::sendFile);
+            bDownload.setOnAction(this::downloadFile);
 
             PaneProgress.setVisible(false);
             //TODO: remove before the production
@@ -370,6 +374,13 @@ public class ClientController implements Initializable, NetListener, TransferLis
     }
 
     @Override
+    public void onTransferCommands(AbstractMessage message) {
+        if (transferService != null){
+            transferService.sendMessage(message);
+        }
+    }
+
+    @Override
     public void startProcess(TransferService sendManager) {
         activeTransmission = true;
         Platform.runLater(() -> {
@@ -392,14 +403,26 @@ public class ClientController implements Initializable, NetListener, TransferLis
             taLog.appendText("File transfer finished" + "\n");
             lStatusDownload.setText("Finished transfer files");
             pbDownload.setProgress(100.0);
+            try {
+                if (transferService instanceof FileDownloadManager
+                        && tfLocalPath.getText().equals(currentPathTransfer)){
+                    fillCurrentDirFiles(lvLocalFiles,
+                            tfLocalPath,
+                            fileViewer.getListFiles(),
+                            fileViewer.getViewDir());
+                }
+                transferService = null;
+                currentPathTransfer = null;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         });
-        try {
-        if (Files.isSameFile(transferService.getPathFile(), fileViewer.getCurrentDir()))
-            Net.getInstance().write(new QueryFileList(fileViewer.getCurrentDir()));
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (tfServerPath.getText().equals(currentPathTransfer))
+            Net.getInstance().write(new QueryFileList());
+        if (transferService instanceof FileSendManager){
+            transferService = null;
+            currentPathTransfer = null;
         }
-        transferService = null;
         hideProgressBar();
     }
 
