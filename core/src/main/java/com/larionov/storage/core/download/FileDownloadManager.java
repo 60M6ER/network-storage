@@ -1,11 +1,7 @@
 package com.larionov.storage.core.download;
 
 import com.larionov.storage.core.download.exeptions.ManagerInUsed;
-import com.larionov.storage.core.net.ErrorMessage;
-import com.larionov.storage.core.net.ProcessedPackage;
-import com.larionov.storage.core.net.SendDescriptionsMessage;
-import com.larionov.storage.core.net.SendFile;
-import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
+import com.larionov.storage.core.net.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +13,7 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 @Slf4j
-public class FileDownloadManager {
+public class FileDownloadManager implements TransferService{
 
     private UUID curTask;
 
@@ -29,35 +25,38 @@ public class FileDownloadManager {
     private long timeStart;
     @Getter
     private String curFileName;
+    @Getter
     private Path curPath;
     private OutputStream outputStream;
     private long curFileSentBytes;
     private int fileProgress;
 
     @Setter
-    private StatusSenderListener listener;
+    private TransferListener listener;
 
-    public FileDownloadManager(StatusSenderListener statusSenderListener) {
-        this.listener = statusSenderListener;
-    }
-
-    public void newTransfer(SendDescriptionsMessage descriptionsMessage, Path path) {
-        if (!finished) throw new ManagerInUsed();
-        curTask = descriptionsMessage.getIdTransfer();
-        size = descriptionsMessage.getSize();
+    public FileDownloadManager(Path path, TransferListener transferListener) {
+        this.listener = transferListener;
         pathFile = path;
         timeStart = System.nanoTime();
         finished = false;
+        listener.startProcess(this);
     }
 
-    private void closeOutputStream() throws IOException {
-        if (outputStream != null){
-            outputStream.close();
-        }
+    private void addInformationTransfer(SendDescriptionsMessage descriptionsMessage) {
+        curTask = descriptionsMessage.getIdTransfer();
+        size = descriptionsMessage.getSize();
+        listener.startSendFiles(this);
     }
 
-    public void sendFile(SendFile sendFile) {
-        if (finished) return;
+    private void createFolder(CreateFolder createFolder) throws IOException {
+        if (finished) throw new IOException("First you need to send a transfer message");
+        Path newFolder = pathFile.resolve(createFolder.getNameFile());
+        Files.createDirectory(newFolder);
+        listener.newSendMessage(new ProcessedPackage(true));
+    }
+
+    private void sendFile(SendFile sendFile) throws IOException {
+        if (finished) throw new IOException("First you need to send a transfer message");
         try {
             if (curFileName == null || !curFileName.equals(sendFile.getPathFile())) {
                 curFileName = sendFile.getPathFile();
@@ -71,7 +70,6 @@ public class FileDownloadManager {
             outputStream.write(sendFile.getData());
             outputStream.flush();
             listener.newSendMessage(new ProcessedPackage(true));
-            log.info("Write " + sendFile.getData().length + " bytes");
             sentBytes += sendFile.getData().length;
             curFileSentBytes += sendFile.getData().length;
             if (curFileSentBytes == sendFile.getSize())
@@ -79,11 +77,60 @@ public class FileDownloadManager {
         } catch (IOException e) {
             listener.newSendMessage(new ErrorMessage(e.getMessage(), e));
             e.printStackTrace();
-            try {
-                closeOutputStream();
-            } catch (IOException ioException) {
-                ioException.printStackTrace();
-            }
+            closeOutputStream();
+            listener.anExceptionOccurred(e, this);
+        }
+    }
+
+    private void closeOutputStream() throws IOException {
+        if (outputStream != null){
+            outputStream.close();
+            listener.finishedDownload(this);
+        }
+    }
+
+    @Override
+    public void send() {
+
+    }
+
+    @Override
+    public StatusSend getStatus() {
+        return null;
+    }
+
+    @Override
+    public Path getPathFile() {
+        return pathFile;
+    }
+
+    @Override
+    public boolean isActive() {
+        return !finished;
+    }
+
+    @Override
+    public void stop() {
+        finished = true;
+    }
+
+    @Override
+    public void sendMessage(AbstractMessage message) {
+        try {
+        switch (message.getTypeMessage()){
+            case CREATE_FOLDER:
+                createFolder((CreateFolder) message);
+                break;
+            case SEND_FILE:
+                sendFile((SendFile) message);
+                break;
+            case SEND_DESCRIPTIONS:
+                addInformationTransfer((SendDescriptionsMessage) message);
+        }
+        } catch (IOException e) {
+            listener.newSendMessage(new ProcessedPackage(false));
+            listener.anExceptionOccurred(e, this);
+            stop();
         }
     }
 }

@@ -1,8 +1,6 @@
 package com.larionov.storage.client;
 
-import com.larionov.storage.core.download.FileSendManager;
-import com.larionov.storage.core.download.StatusSend;
-import com.larionov.storage.core.download.StatusSenderListener;
+import com.larionov.storage.core.download.*;
 import com.larionov.storage.core.download.exeptions.ErrorReceiveFile;
 import com.larionov.storage.core.files.FileDescription;
 import com.larionov.storage.core.files.FileViewer;
@@ -20,10 +18,11 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.ResourceBundle;
 @Slf4j
-public class ClientController implements Initializable, NetListener, StatusSenderListener {
+public class ClientController implements Initializable, NetListener, TransferListener {
 
     private static final int DELAY_PROGRESS_BAR = 5 * 1000;
 
@@ -50,7 +49,7 @@ public class ClientController implements Initializable, NetListener, StatusSende
     private MenuItem miRename;
     private MenuItem miDelete;
 
-    private FileSendManager fileSendManager;
+    private TransferService transferService;
     private boolean activeTransmission = false;
 
     private FileViewer fileViewer;
@@ -60,17 +59,29 @@ public class ClientController implements Initializable, NetListener, StatusSende
     private ObservableList<String> paths;
 
     public void sendFile(ActionEvent actionEvent) {
-        if (fileSendManager != null){
+        if (transferService != null){
             taLog.appendText("File transfer in progress\n");
             return;
         }
-        fileSendManager = new FileSendManager(
+        transferService = new FileSendManager(
                 fileViewer.getPathToFile(
                         lvLocalFiles.getSelectionModel().getSelectedItem().getName()
                 ),
                 this
         );
-        fileSendManager.send();
+        transferService.send();
+    }
+
+    public void downloadFile(ActionEvent actionEvent) {
+        if (transferService != null){
+            taLog.appendText("File transfer in progress\n");
+            return;
+        }
+        transferService = new FileDownloadManager(
+                fileViewer.getCurrentDir(),
+                this
+        );
+        Net.getInstance().write(new QueryFile(lvServerFiles.getSelectionModel().getSelectedItem().getName()));
     }
 
     private void fillCurrentDirFiles(ListView<FileDescription> lvFiles, TextField path, List<FileDescription> filesList, String viewPath) {
@@ -297,7 +308,7 @@ public class ClientController implements Initializable, NetListener, StatusSende
         task.run();
     }
 
-    private void updateProgressDownload(FileSendManager sendManager){
+    private void updateProgressDownload(TransferService sendManager){
         Platform.runLater(() -> {
             StatusSend status = sendManager.getStatus();
             lStatusDownload.setText(status.getMessageStatus());
@@ -327,9 +338,9 @@ public class ClientController implements Initializable, NetListener, StatusSende
         taLog.appendText("Server return error: " + message.getMessage() + "\n");
         if (message.getException() != null
                 && message.getException() instanceof ErrorReceiveFile
-                && fileSendManager != null
-                && fileSendManager.getThread().isAlive()){
-            fileSendManager.getThread().interrupt();
+                && transferService != null
+                && transferService.isActive()){
+            transferService.stop();
         }
     }
 
@@ -353,17 +364,13 @@ public class ClientController implements Initializable, NetListener, StatusSende
 
     @Override
     public void onProcessedPackage(ProcessedPackage message) {
-        if (fileSendManager != null) {
-            try {
-                FileSendManager.getSynchronizer().exchange(message.isOK());
-            } catch (InterruptedException interruptedException) {
-                interruptedException.printStackTrace();
-            }
+        if (transferService != null) {
+            transferService.sendMessage(message);
         }
     }
 
     @Override
-    public void startProcess(FileSendManager sendManager) {
+    public void startProcess(TransferService sendManager) {
         activeTransmission = true;
         Platform.runLater(() -> {
             taLog.appendText("Start transfer file: " + sendManager.getCurFileName() + "\n");
@@ -374,29 +381,30 @@ public class ClientController implements Initializable, NetListener, StatusSende
     }
 
     @Override
-    public void startSendFiles(FileSendManager sendManager) {
+    public void startSendFiles(TransferService sendManager) {
         updateProgressDownload(sendManager);
     }
 
     @Override
-    public void sendStatus(FileSendManager sendManager) {
-        //updateProgressDownload(sendManager);
-    }
-
-    @Override
-    public void finishedDownload(FileSendManager sendManager) {
+    public void finishedDownload(TransferService sendManager) {
         activeTransmission = false;
         Platform.runLater(() -> {
             taLog.appendText("File transfer finished" + "\n");
             lStatusDownload.setText("Finished transfer files");
             pbDownload.setProgress(100.0);
         });
-        fileSendManager = null;
+        try {
+        if (Files.isSameFile(transferService.getPathFile(), fileViewer.getCurrentDir()))
+            Net.getInstance().write(new QueryFileList(fileViewer.getCurrentDir()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        transferService = null;
         hideProgressBar();
     }
 
     @Override
-    public void anExceptionOccurred(Exception e, FileSendManager fileSendManager) {
+    public void anExceptionOccurred(Exception e, TransferService fileSendManager) {
         Platform.runLater(() -> taLog.appendText("File transfer failed: " + e.getMessage() + "\n"));
         hideProgressBar();
     }

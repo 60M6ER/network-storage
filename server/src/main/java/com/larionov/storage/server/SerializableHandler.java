@@ -3,8 +3,10 @@ package com.larionov.storage.server;
 import com.larionov.storage.core.auth.AuthorizationService;
 import com.larionov.storage.core.download.FileDownloadManager;
 import com.larionov.storage.core.download.FileSendManager;
-import com.larionov.storage.core.download.StatusSenderListener;
+import com.larionov.storage.core.download.TransferListener;
+import com.larionov.storage.core.download.TransferService;
 import com.larionov.storage.core.download.exeptions.ErrorReceiveFile;
+import com.larionov.storage.core.download.exeptions.ManagerInUsed;
 import com.larionov.storage.core.files.FileViewer;
 import com.larionov.storage.core.net.*;
 import io.netty.channel.Channel;
@@ -17,13 +19,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 @Slf4j
-public class SerializableHandler extends SimpleChannelInboundHandler<AbstractMessage> implements StatusSenderListener {
+public class SerializableHandler extends SimpleChannelInboundHandler<AbstractMessage> implements TransferListener {
 
     private String login;
     private Path path;
     private FileViewer fileViewer;
     private AuthorizationService authorizationService;
-    private FileDownloadManager fileDownloadManager = new FileDownloadManager(this);
+    private TransferService transferService;
     private Channel channel;
 
     public SerializableHandler(Path path, AuthorizationService authorizationService) {
@@ -64,9 +66,13 @@ public class SerializableHandler extends SimpleChannelInboundHandler<AbstractMes
                     break;
                 case CREATE_FOLDER:
                     CreateFolder createFolder = (CreateFolder) abstractMessage;
-                    fileViewer.createFolder(createFolder.getNameFile());
-                    if (!createFolder.isSendingFile())
-                        sendFileList(ctx);
+                    if (createFolder.isSendingFile()){
+                        transferService.sendMessage(createFolder);
+                    }else {
+                        fileViewer.createFolder(createFolder.getNameFile());
+                        if (!createFolder.isSendingFile())
+                            sendFileList(ctx);
+                    }
                     break;
                 case RENAME:
                     RenameFile renameMessage = (RenameFile) abstractMessage;
@@ -82,14 +88,29 @@ public class SerializableHandler extends SimpleChannelInboundHandler<AbstractMes
                     sendFileList(ctx);
                     break;
                 case SEND_DESCRIPTIONS:
-                    fileDownloadManager.newTransfer((SendDescriptionsMessage) abstractMessage, fileViewer.getCurrentDir());
+                    if (transferService == null || !transferService.isActive()){
+                        transferService = new FileDownloadManager(
+                                fileViewer.getCurrentDir(),
+                                this
+                        );
+                        transferService.sendMessage(abstractMessage);
+                    }else {
+                        throw new ManagerInUsed();
+                    }
                     break;
                 case SEND_FILE:
-                    fileDownloadManager.sendFile((SendFile) abstractMessage);
+                    if (transferService == null || !transferService.isActive()) throw new RuntimeException("Create new manager");
+                    transferService.sendMessage(abstractMessage);
+                    break;
+                case QUERY_FILE_LIST:
+                    sendFileList(ctx);
+                    break;
+                case QUERY_FILE:
             }
         } catch (Exception e) {
             if (abstractMessage instanceof CreateFolder && ((CreateFolder) abstractMessage).isSendingFile()
-                    || abstractMessage instanceof SendFile) {
+                    || abstractMessage instanceof SendFile
+                    || abstractMessage instanceof SendDescriptionsMessage) {
                     ctx.writeAndFlush(new ErrorMessage(e.getMessage(),
                             new ErrorReceiveFile(e.getMessage())));
             }
@@ -109,28 +130,24 @@ public class SerializableHandler extends SimpleChannelInboundHandler<AbstractMes
     }
 
     @Override
-    public void startProcess(FileSendManager sendManager) {
+    public void startProcess(TransferService transferService) {
+        log.info("Start transfer file for user: " + login);
+    }
+
+    @Override
+    public void startSendFiles(TransferService transferService) {
 
     }
 
     @Override
-    public void startSendFiles(FileSendManager sendManager) {
-
+    public void finishedDownload(TransferService transferService) {
+        log.info("Finished transfer file for user: " + login);
+        this.transferService = null;
     }
 
     @Override
-    public void sendStatus(FileSendManager sendManager) {
-
-    }
-
-    @Override
-    public void finishedDownload(FileSendManager sendManager) {
-
-    }
-
-    @Override
-    public void anExceptionOccurred(Exception e, FileSendManager fileSendManager) {
-
+    public void anExceptionOccurred(Exception e, TransferService fileSendManager) {
+        channel.writeAndFlush(new ErrorMessage(e.getMessage(), e));
     }
 
     @Override
